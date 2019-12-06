@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import click
 import os
 import shlex
 import subprocess
@@ -52,7 +53,7 @@ class Repository(object):
         self._name = name
         self._surname = surname
         self._repository_name = self._build_repository_name()
-        self.score = DEFAULT_SCORE
+        self._score = DEFAULT_SCORE
 
     def _build_repository_name(self):
         translit_surname = translit(self._surname, 'ru', reversed=True)
@@ -72,9 +73,9 @@ class Repository(object):
     def apply_deadline_score(self):
         oldest_commit_time = self._get_oldest_commit_time()
         if oldest_commit_time is None:
-            self.score = EMPTY_REPOSITORY_SCORE
+            self._score = EMPTY_REPOSITORY_SCORE
         elif oldest_commit_time >= DEADLINE:
-            self.score = AFTER_DEADLINE_SCORE_GENERATOR(oldest_commit_time - DEADLINE)
+            self._score = AFTER_DEADLINE_SCORE_GENERATOR(oldest_commit_time - DEADLINE)
 
     def _get_oldest_commit_time(self):
         local_repository_path = os.path.join(WORK_DIR, self._repository_name)
@@ -89,6 +90,14 @@ class Repository(object):
             if oldest_commit_time is None or oldest_commit_time > commit.committed_date:
                 oldest_commit_time = commit.committed_date
         return oldest_commit_time
+
+    @property
+    def owner(self):
+        return "{name} {surname}".format(name=self._name, surname=self._surname)
+
+    @property
+    def score(self):
+        return self._score
 
 
 class Spreadsheet(object):
@@ -167,16 +176,29 @@ def get_repositories(names_row, surnames_row):
     return repositories
 
 
+def apply_new_scores(repositories, scores_row):
+    new_scores_row = []
+    for repository, score in zip(repositories, scores_row):
+        repository.apply_deadline_score()
+        current_score = float(score[0].replace(',', '.'))
+        if current_score != repository.score:
+            print("Score for {owner} will be changed: {old}->{new}".format(owner=repository.owner,
+                                                                           old=current_score,
+                                                                           new=repository.score))
+        new_scores_row.append([repository.score])
+    return new_scores_row
+
+
 def main():
     make_work_dir_if_needed()
     sheet = Spreadsheet(SPREADSHEET_ID)
     names_row = sheet.read(NAME_RANGE)
     surnames_row = sheet.read(SURNAME_RANGE)
+    scores_row = sheet.read(SCORE_RANGE)
     repositories = get_repositories(names_row, surnames_row)
-    for repository in repositories:
-        repository.apply_deadline_score()
-    scores_row = [[repository.score] for repository in repositories]
-    sheet.write(scores_row, SCORE_RANGE)
+    scores_row = apply_new_scores(repositories, scores_row)
+    if click.confirm('Publish new score?', default=True):
+        sheet.write(scores_row, SCORE_RANGE)
 
 
 if __name__ == '__main__':

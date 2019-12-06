@@ -7,9 +7,10 @@
 2. Скачаем питономодули:
 ```
 pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
+pip install --upgrade gitpython
+pip install --upgrade click
 pip install --upgrade transliterate
 pip install --upgrade tqdm
-pip install --upgrade gitpython
 ```
 3. Настраиваем константы в _script.py_:
 ```py
