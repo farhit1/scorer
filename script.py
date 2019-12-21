@@ -150,8 +150,8 @@ def make_work_dir_if_needed():
         os.mkdir(WORK_DIR)
 
 
-def wait_for_running_processes_if_needed(running_processes, force):
-    if len(running_processes) < MAX_ACTIVE_PROCESSES and not force:
+def wait_for_running_processes(running_processes):
+    if len(running_processes) < MAX_ACTIVE_PROCESSES:
         return running_processes
 
     for process in running_processes:
@@ -159,20 +159,19 @@ def wait_for_running_processes_if_needed(running_processes, force):
         output = "\n".join(line.decode() for line in output_lines)
         if 'fatal' in output:
             tqdm.tqdm.write(output)
-    return []
 
 
 def get_repositories(names_row, surnames_row):
     running_processes = []
     repositories = []
     users = [(name[0], surname[0]) for name, surname in zip(names_row, surnames_row)]
-    for name, surname in tqdm.tqdm(users):
-        running_processes = wait_for_running_processes_if_needed(running_processes, False)
-        repository = Repository(name, surname)
+    for i, name_surname in enumerate(tqdm.tqdm(users)):
+        if i % MAX_ACTIVE_PROCESSES == 0 or i == len(users)-1:
+            wait_for_running_processes(running_processes)
+            running_processes = []
+        repository = Repository(*name_surname)
         running_processes.append(repository.run_clone())
         repositories.append(repository)
-
-    wait_for_running_processes_if_needed(running_processes, True)
     return repositories
 
 
